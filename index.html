@@ -7,34 +7,36 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h2>Please Sign Below:</h2>
-    <div class="signature-container">
-        <svg id="signature-pad" width="400" height="200"></svg>
-    </div>
-    
-    <div class="input-group">
-        <label for="save-user-id">User ID to Save:</label>
-        <input type="text" id="save-user-id" placeholder="e.g., user_123">
-    </div>
-
-    <div class="button-container">
-        <button id="clear-btn">Clear</button>
-        <button id="save-btn">Save Signature</button>
+    <!-- View 1: Initial User ID Check -->
+    <div id="user-check-view">
+        <h2>E-Signature Attestation</h2>
+        <div class="input-group">
+            <label for="user-id">Enter Your User ID:</label>
+            <input type="text" id="user-id" placeholder="e.g., user_123">
+        </div>
+        <div class="button-container">
+            <button id="check-btn">Check / Sign</button>
+        </div>
     </div>
 
-    <hr>
-
-    <div class="input-group">
-        <label for="load-user-id">User ID to Load:</label>
-        <input type="text" id="load-user-id" placeholder="e.g., user_123">
+    <!-- View 2: Signature Pad (hidden by default) -->
+    <div id="signature-view" class="hidden">
+        <h2>Please Sign Below:</h2>
+        <p>User ID: <span id="display-user-id"></span></p>
+        <div class="signature-container">
+            <svg id="signature-pad" width="400" height="200"></svg>
+        </div>
+        <div class="button-container">
+            <button id="clear-btn">Clear</button>
+            <button id="save-btn">Save Signature</button>
+        </div>
     </div>
-    <div class="button-container">
-        <button id="load-btn">Load Signature by ID</button>
-    </div>
 
-    <h3>Signature Display:</h3>
-    <div id="signature-display" class="signature-display-box">
-        Enter a User ID and click "Load" to see a signature.
+    <!-- View 3: Result Display (hidden by default) -->
+    <div id="result-view" class="hidden">
+        <h3 id="result-heading"></h3>
+        <div id="signature-display"></div>
+        <button id="start-over-btn">Start Over</button>
     </div>
 
     <script src="script.js"></script>

@@ -21,6 +21,11 @@ body {
     display: block;
 }
 
+/* Utility class to hide elements */
+.hidden {
+    display: none;
+}
+
 /* New style for input groups */
 .input-group {
     margin-top: 15px;
@@ -63,13 +68,6 @@ button {
     color: white;
 }
 
-hr {
-    width: 400px;
-    margin: 25px 0;
-    border: 0;
-    border-top: 1px solid #ccc;
-}
-
 /* Updated style for the display box */
 #signature-display {
     width: 400px;
@@ -84,6 +82,7 @@ hr {
     display: grid; /* Use grid to center content */
     place-items: center;
     font-family: monospace;
+    margin-top: 10px;
     overflow-y: auto;
 }
 

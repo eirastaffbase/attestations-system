@@ -1,18 +1,38 @@
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx6W4263eNu6AQe8zYvLW1K0Ks_Qmr7JWqdfQ3iG0nNnCUIusH-EaQd3RW8dNHENF4tIg/exec";
 
 document.addEventListener("DOMContentLoaded", () => {
+    // Views
+    const userCheckView = document.getElementById('user-check-view');
+    const signatureView = document.getElementById('signature-view');
+    const resultView = document.getElementById('result-view');
+
+    // User ID Input
+    const userIdInput = document.getElementById('user-id');
+    const checkBtn = document.getElementById('check-btn');
+
+    // Signature Pad Elements
     const svg = document.getElementById('signature-pad');
     const clearBtn = document.getElementById('clear-btn');
     const saveBtn = document.getElementById('save-btn');
-    const loadBtn = document.getElementById('load-btn');
-    
-    const saveUserIdInput = document.getElementById('save-user-id');
-    const loadUserIdInput = document.getElementById('load-user-id');
-    const signatureDisplay = document.getElementById('signature-display'); 
+    const displayUserId = document.getElementById('display-user-id');
+
+    // Result View Elements
+    const resultHeading = document.getElementById('result-heading');
+    const signatureDisplay = document.getElementById('signature-display');
+    const startOverBtn = document.getElementById('start-over-btn');
 
     let drawing = false;
     let currentPath;
     let currentPathData;
+    let currentUserId = '';
+
+    // --- Helper Functions ---
+    function showView(view) {
+        userCheckView.classList.add('hidden');
+        signatureView.classList.add('hidden');
+        resultView.classList.add('hidden');
+        view.classList.remove('hidden');
+    }
 
     function getEventPosition(e) {
         const rect = svg.getBoundingClientRect();
@@ -28,6 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
+    // --- Drawing Functions ---
     function startDrawing(e) {
         e.preventDefault(); 
         drawing = true;
@@ -66,9 +87,57 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener('mouseup', stopDrawing);
     window.addEventListener('touchend', stopDrawing);
 
+    // --- Event Listeners ---
+
     clearBtn.addEventListener('click', () => {
         svg.innerHTML = '';
-        signatureDisplay.innerHTML = 'Pad cleared...';
+    });
+
+    startOverBtn.addEventListener('click', () => {
+        currentUserId = '';
+        userIdInput.value = '';
+        svg.innerHTML = '';
+        signatureDisplay.innerHTML = '';
+        showView(userCheckView);
+    });
+
+    checkBtn.addEventListener('click', () => {
+        const userId = userIdInput.value.trim();
+        if (!userId) {
+            alert("Please enter a User ID.");
+            return;
+        }
+        currentUserId = userId;
+
+        checkBtn.textContent = 'Checking...';
+        checkBtn.disabled = true;
+
+        const fetchUrl = `${SCRIPT_URL}?userId=${encodeURIComponent(userId)}`;
+
+        fetch(fetchUrl)
+            .then(response => response.json())
+            .then(result => {
+                if (result.status === 'success') {
+                    // Signature found, show result view
+                    resultHeading.textContent = `Welcome back, ${userId}! You have already signed.`;
+                    signatureDisplay.innerHTML = result.data; 
+                    showView(resultView);
+                } else if (result.status === 'not_found') {
+                    // No signature, show signing pad
+                    displayUserId.textContent = userId;
+                    showView(signatureView);
+                } else {
+                    alert(`Error: ${result.message}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert(`Fetch Error: ${error.message}`);
+            })
+            .finally(() => {
+                checkBtn.textContent = 'Check / Sign';
+                checkBtn.disabled = false;
+            });
     });
 
     saveBtn.addEventListener('click', () => {
@@ -77,82 +146,56 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        const userId = saveUserIdInput.value.trim();
-        if (!userId) {
-            alert("Please enter a User ID to save.");
-            return;
-        }
-
         const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">${svg.innerHTML}</svg>`;
         const entry = {
-            userId: userId, 
+            userId: currentUserId,
             svgData: svgString
         };
 
         saveBtn.textContent = 'Saving...';
         saveBtn.disabled = true;
+        clearBtn.disabled = true;
 
+        // Show a loading message in the result view
+        resultHeading.textContent = `Saving signature for ${currentUserId}...`;
+        signatureDisplay.innerHTML = 'Please wait.';
+        showView(resultView);
+
+        // POST the new signature
         fetch(SCRIPT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain', 
-            },
-            body: JSON.stringify(entry),
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify(entry),
             })
-        .then(response => response.json()) 
-        .then(result => {
-            console.log("Response from server:", result);
-            if (result.status === 'success') {
-                signatureDisplay.textContent = `Signature saved for ${userId}!`;
-                svg.innerHTML = ''; // Clear the pad
-            } else {
-                signatureDisplay.textContent = `Error saving: ${result.message}`;
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            signatureDisplay.textContent = `Fetch Error: ${error.message}.`;
-        })
-        .finally(() => {
-            saveBtn.textContent = 'Save Signature';
-            saveBtn.disabled = false;
-        });
-    });
-
-    // --- Load Signature by ID ---
-    loadBtn.addEventListener('click', () => {
-        const userId = loadUserIdInput.value.trim();
-        if (!userId) {
-            alert("Please enter a User ID to load.");
-            return;
-        }
-
-        signatureDisplay.textContent = 'Loading...'; // Changed text
-        loadBtn.textContent = 'Loading...';
-        loadBtn.disabled = true;
-
-        // fetch URL with userId
-        const fetchUrl = `${SCRIPT_URL}?userId=${encodeURIComponent(userId)}`;
-
-        fetch(fetchUrl)
             .then(response => response.json())
-            .then(result => {
-                if (result.status === 'success') {
-                    // Render svg
-                    signatureDisplay.innerHTML = result.data; 
-                } else if (result.status === 'not_found') {
-                    signatureDisplay.textContent = `No signature found for User ID: ${userId}`;
+            .then(postResult => {
+                if (postResult.status !== 'success') {
+                    throw new Error(postResult.message || 'Failed to save signature.');
+                }
+                // After successful save, GET it back to display
+                const fetchUrl = `${SCRIPT_URL}?userId=${encodeURIComponent(currentUserId)}`;
+                return fetch(fetchUrl);
+            })
+            .then(response => response.json())
+            .then(getResult => {
+                if (getResult.status === 'success') {
+                    resultHeading.textContent = `Signature Saved for ${currentUserId}!`;
+                    signatureDisplay.innerHTML = getResult.data;
                 } else {
-                    signatureDisplay.textContent = `Error loading data: ${result.message}`;
+                    throw new Error(getResult.message || 'Could not retrieve saved signature.');
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                signatureDisplay.textContent = `Fetch Error: ${error.message}`;
+                console.error('Error during save process:', error);
+                resultHeading.textContent = 'An Error Occurred';
+                signatureDisplay.innerHTML = `Error: ${error.message}<br><br>Please try again.`;
             })
             .finally(() => {
-                loadBtn.textContent = 'Load Signature by ID';
-                loadBtn.disabled = false;
+                // Reset signature view buttons
+                saveBtn.textContent = 'Save Signature';
+                saveBtn.disabled = false;
+                clearBtn.disabled = false;
+                svg.innerHTML = ''; // Clear the pad for next time
             });
     });
 });
