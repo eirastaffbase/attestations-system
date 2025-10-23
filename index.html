@@ -30,20 +30,6 @@
             display: none;
         }
 
-        /* New style for input groups */
-        .input-group {
-            margin-top: 15px;
-        }
-        .input-group label {
-            margin-right: 10px;
-            font-weight: bold;
-        }
-        .input-group input {
-            padding: 5px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-
         .button-container {
             margin-top: 15px;
         }
@@ -64,11 +50,6 @@
 
         #save-btn {
             background-color: #28a745;
-            color: white;
-        }
-
-        #load-btn {
-            background-color: #007bff;
             color: white;
         }
 
@@ -98,22 +79,14 @@
     </style>
 </head>
 <body>
-    <!-- View 1: Initial User ID Check -->
-    <div id="user-check-view">
-        <h2>E-Signature Attestation</h2>
-        <div class="input-group">
-            <label for="user-id">Enter Your User ID:</label>
-            <input type="text" id="user-id" placeholder="e.g., user_123">
-        </div>
-        <div class="button-container">
-            <button id="check-btn">Check / Sign</button>
-        </div>
+    <div id="loading-view">
+        <h2>Checking for signature...</h2>
     </div>
 
-    <!-- View 2: Signature Pad (hidden by default) -->
     <div id="signature-view" class="hidden">
         <h2>Please Sign Below:</h2>
         <p>User ID: <span id="display-user-id"></span></p>
+        <p>Resource ID: <span id="display-resource-id"></span></p>
         <div class="signature-container">
             <svg id="signature-pad" width="400" height="200"></svg>
         </div>
@@ -123,45 +96,40 @@
         </div>
     </div>
 
-    <!-- View 3: Result Display (hidden by default) -->
     <div id="result-view" class="hidden">
         <h3 id="result-heading"></h3>
         <div id="signature-display"></div>
-        <button id="start-over-btn">Start Over</button>
-    </div>
+        </div>
 
     <script>
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx6W4263eNu6AQe8zYvLW1K0Ks_Qmr7JWqdfQ3iG0nNnCUIusH-EaQd3RW8dNHENF4tIg/exec";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzjRX4XgKyPk4mW0QeaaHjd5Xp5yaFtUsaVmNi0H0IGEOHIeht4PpRmh5zrTlMx2LQ50w/exec";
 
         document.addEventListener("DOMContentLoaded", () => {
             // Views
-            const userCheckView = document.getElementById('user-check-view');
+            const loadingView = document.getElementById('loading-view');
             const signatureView = document.getElementById('signature-view');
             const resultView = document.getElementById('result-view');
-
-            // User ID Input
-            const userIdInput = document.getElementById('user-id');
-            const checkBtn = document.getElementById('check-btn');
 
             // Signature Pad Elements
             const svg = document.getElementById('signature-pad');
             const clearBtn = document.getElementById('clear-btn');
             const saveBtn = document.getElementById('save-btn');
             const displayUserId = document.getElementById('display-user-id');
+            const displayResourceId = document.getElementById('display-resource-id'); // Added
 
             // Result View Elements
             const resultHeading = document.getElementById('result-heading');
             const signatureDisplay = document.getElementById('signature-display');
-            const startOverBtn = document.getElementById('start-over-btn');
 
+            // --- App State ---
             let drawing = false;
-            let currentPath;
-            let currentUserId = '';
             let points = []; 
+            let currentUserId = '';
+            let currentResourceId = '';
 
             // --- Helper Functions ---
             function showView(view) {
-                userCheckView.classList.add('hidden');
+                loadingView.classList.add('hidden');
                 signatureView.classList.add('hidden');
                 resultView.classList.add('hidden');
                 view.classList.remove('hidden');
@@ -182,17 +150,12 @@
             }
 
             // --- Stroke Tapering/Smoothing Logic ---
-            // Helper to calculate distance between two points
             function distance(p1, p2) {
                 return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
             }
-
-            // Helper to calculate midpoint between two points
             function midpoint(p1, p2) {
                 return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
             }
-
-            // Function to create a tapered path segment
             function createPathSegment(lastPoint, newPoint, lastWidth) {
                 const newWidth = Math.min(2.5, Math.max(0.5, 2.5 - distance(lastPoint, newPoint) / 15));
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -210,9 +173,8 @@
                 e.preventDefault();
                 drawing = true;
                 const { x, y } = getEventPosition(e);
-                points = [{ x, y, width: 0.5 }]; // Start with a thin point
+                points = [{ x, y, width: 0.5 }]; 
             }
-
             function draw(e) {
                 if (!drawing) return;
                 e.preventDefault();
@@ -222,33 +184,25 @@
                 const newWidth = Math.min(2.5, Math.max(0.5, 2.5 - dist / 15));
                 points.push({ x, y, width: newWidth });
 
-                // Draw smoothed curve using multiple path segments for variable width
                 if (points.length > 2) {
                     const p0 = points[points.length - 3];
                     const p1 = points[points.length - 2];
                     const p2 = points[points.length - 1];
-
                     const mid1 = midpoint(p0, p1);
                     const mid2 = midpoint(p1, p2);
-
                     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                    // Use cubic bezier for a smoother curve
                     const pathData = `M ${mid1.x.toFixed(2)} ${mid1.y.toFixed(2)} Q ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}, ${mid2.x.toFixed(2)} ${mid2.y.toFixed(2)}`;
                     path.setAttribute('d', pathData);
                     path.setAttribute('stroke', '#000');
-                    // Average width for the segment
                     path.setAttribute('stroke-width', ((p1.width + p2.width) / 2).toFixed(2));
                     path.setAttribute('stroke-linecap', 'round');
                     path.setAttribute('fill', 'none');
                     svg.appendChild(path);
                 }
             }
-
             function stopDrawing() {
                 if (!drawing) return;
                 drawing = false;
-
-                // Taper the end of the stroke
                 if (points.length > 1) {
                     const last = points[points.length - 1];
                     const secondLast = points[points.length - 2];
@@ -265,57 +219,9 @@
             window.addEventListener('mouseup', stopDrawing);
             window.addEventListener('touchend', stopDrawing);
 
-            // --- Event Listeners ---
-
+            // --- Button Event Listeners ---
             clearBtn.addEventListener('click', () => {
                 svg.innerHTML = '';
-            });
-
-            startOverBtn.addEventListener('click', () => {
-                currentUserId = '';
-                userIdInput.value = '';
-                svg.innerHTML = '';
-                signatureDisplay.innerHTML = '';
-                showView(userCheckView);
-            });
-
-            checkBtn.addEventListener('click', () => {
-                const userId = userIdInput.value.trim();
-                if (!userId) {
-                    alert("Please enter a User ID.");
-                    return;
-                }
-                currentUserId = userId;
-
-                checkBtn.textContent = 'Checking...';
-                checkBtn.disabled = true;
-
-                const fetchUrl = `${SCRIPT_URL}?userId=${encodeURIComponent(userId)}`;
-
-                fetch(fetchUrl)
-                    .then(response => response.json())
-                    .then(result => {
-                        if (result.status === 'success') {
-                            // Signature found, show result view
-                            resultHeading.textContent = `Welcome back, ${userId}! You have already signed.`;
-                            signatureDisplay.innerHTML = result.data;
-                            showView(resultView);
-                        } else if (result.status === 'not_found') {
-                            // No signature, show signing pad
-                            displayUserId.textContent = userId;
-                            showView(signatureView);
-                        } else {
-                            alert(`Error: ${result.message}`);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert(`Fetch Error: ${error.message}`);
-                    })
-                    .finally(() => {
-                        checkBtn.textContent = 'Check / Sign';
-                        checkBtn.disabled = false;
-                    });
             });
 
             saveBtn.addEventListener('click', () => {
@@ -327,6 +233,7 @@
                 const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">${svg.innerHTML}</svg>`;
                 const entry = {
                     userId: currentUserId,
+                    resourceId: currentResourceId, // <-- ADDED
                     svgData: svgString
                 };
 
@@ -334,7 +241,6 @@
                 saveBtn.disabled = true;
                 clearBtn.disabled = true;
 
-                // Show a loading message in the result view
                 resultHeading.textContent = `Saving signature for ${currentUserId}...`;
                 signatureDisplay.innerHTML = 'Please wait.';
                 showView(resultView);
@@ -351,7 +257,7 @@
                             throw new Error(postResult.message || 'Failed to save signature.');
                         }
                         // After successful save, GET it back to display
-                        const fetchUrl = `${SCRIPT_URL}?userId=${encodeURIComponent(currentUserId)}`;
+                        const fetchUrl = `${SCRIPT_URL}?userId=${encodeURIComponent(currentUserId)}&resourceId=${encodeURIComponent(currentResourceId)}`; // <-- UPDATED
                         return fetch(fetchUrl);
                     })
                     .then(response => response.json())
@@ -369,13 +275,61 @@
                         signatureDisplay.innerHTML = `Error: ${error.message}<br><br>Please try again.`;
                     })
                     .finally(() => {
-                        // Reset signature view buttons
                         saveBtn.textContent = 'Save Signature';
                         saveBtn.disabled = false;
                         clearBtn.disabled = false;
-                        svg.innerHTML = ''; // Clear the pad for next time
+                        svg.innerHTML = ''; 
                     });
             });
+
+            // --- NEW: Initial Check Function ---
+            function checkSignature() {
+                // Get IDs from the <body> tag
+                currentUserId = document.body.dataset.userId;
+                currentResourceId = document.body.dataset.resourceId;
+
+                if (!currentUserId || !currentResourceId) {
+                    resultHeading.textContent = 'Configuration Error';
+                    signatureDisplay.innerHTML = 'Could not find User ID or Resource ID.';
+                    showView(resultView);
+                    return;
+                }
+
+                // Show loading view while we check
+                showView(loadingView);
+
+                const fetchUrl = `${SCRIPT_URL}?userId=${encodeURIComponent(currentUserId)}&resourceId=${encodeURIComponent(currentResourceId)}`;
+
+                fetch(fetchUrl)
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.status === 'success') {
+                            // Signature found, show result view
+                            resultHeading.textContent = `Welcome back, ${currentUserId}! You have already signed for this resource.`;
+                            signatureDisplay.innerHTML = result.data;
+                            showView(resultView);
+                        } else if (result.status === 'not_found') {
+                            // No signature, show signing pad
+                            displayUserId.textContent = currentUserId;
+                            displayResourceId.textContent = currentResourceId; // Added
+                            showView(signatureView);
+                        } else {
+                            // Handle other errors
+                            resultHeading.textContent = 'An Error Occurred';
+                            signatureDisplay.innerHTML = `Error: ${result.message}`;
+                            showView(resultView);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        resultHeading.textContent = 'Fetch Error';
+                        signatureDisplay.innerHTML = `Error: ${error.message}`;
+                        showView(resultView);
+                    });
+            }
+
+            // --- Run the initial check on load ---
+            checkSignature();
         });
     </script>
 </body>
