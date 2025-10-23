@@ -84,13 +84,13 @@
     </div>
 
     <div id="signature-view" class="hidden">
-        <h2>Please Sign Below:</h2>
+        <h2>Please sign below:</h2>
         <div class="signature-container">
             <svg id="signature-pad" width="400" height="200"></svg>
         </div>
         <div class="button-container">
             <button id="clear-btn">Clear</button>
-            <button id="save-btn">Save Signature</button>
+            <button id="save-btn">Save signature</button>
         </div>
     </div>
 
@@ -112,8 +112,6 @@
             const svg = document.getElementById('signature-pad');
             const clearBtn = document.getElementById('clear-btn');
             const saveBtn = document.getElementById('save-btn');
-            const displayUserId = document.getElementById('display-user-id');
-            const displayResourceId = document.getElementById('display-resource-id'); // Added
 
             // Result View Elements
             const resultHeading = document.getElementById('result-heading');
@@ -239,7 +237,7 @@
                 saveBtn.disabled = true;
                 clearBtn.disabled = true;
 
-                resultHeading.textContent = `Saving signature for ${currentUserId}...`;
+                resultHeading.textContent = 'Saving signature...';
                 signatureDisplay.innerHTML = 'Please wait.';
                 showView(resultView);
 
@@ -261,7 +259,7 @@
                     .then(response => response.json())
                     .then(getResult => {
                         if (getResult.status === 'success') {
-                            resultHeading.textContent = `Signature saved!`;
+                            resultHeading.textContent = 'Signature saved!';
                             signatureDisplay.innerHTML = getResult.data;
                         } else {
                             throw new Error(getResult.message || 'Could not retrieve saved signature.');
@@ -269,11 +267,11 @@
                     })
                     .catch(error => {
                         console.error('Error during save process:', error);
-                        resultHeading.textContent = 'An Error Occurred';
+                        resultHeading.textContent = 'An error occurred';
                         signatureDisplay.innerHTML = `Error: ${error.message}<br><br>Please try again.`;
                     })
                     .finally(() => {
-                        saveBtn.textContent = 'Save Signature';
+                        saveBtn.textContent = 'Save signature';
                         saveBtn.disabled = false;
                         clearBtn.disabled = false;
                         svg.innerHTML = ''; 
@@ -287,7 +285,7 @@
                 currentResourceId = document.body.dataset.resourceId;
 
                 if (!currentUserId || !currentResourceId) {
-                    resultHeading.textContent = 'Configuration Error';
+                    resultHeading.textContent = 'Configuration error';
                     signatureDisplay.innerHTML = 'Could not find User ID or Resource ID.';
                     showView(resultView);
                     return;
@@ -303,24 +301,22 @@
                     .then(result => {
                         if (result.status === 'success') {
                             // Signature found, show result view
-                            resultHeading.textContent = `Welcome back! You have already signed this post.`;
+                            resultHeading.textContent = 'Welcome back! You have already signed for this resource.';
                             signatureDisplay.innerHTML = result.data;
                             showView(resultView);
                         } else if (result.status === 'not_found') {
                             // No signature, show signing pad
-                            displayUserId.textContent = currentUserId;
-                            displayResourceId.textContent = currentResourceId; // Added
                             showView(signatureView);
                         } else {
                             // Handle other errors
-                            resultHeading.textContent = 'An Error Occurred';
+                            resultHeading.textContent = 'An error occurred';
                             signatureDisplay.innerHTML = `Error: ${result.message}`;
                             showView(resultView);
                         }
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        resultHeading.textContent = 'Fetch Error';
+                        resultHeading.textContent = 'Fetch error';
                         signatureDisplay.innerHTML = `Error: ${error.message}`;
                         showView(resultView);
                     });
