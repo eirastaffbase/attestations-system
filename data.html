@@ -91,8 +91,9 @@
         document.addEventListener("DOMContentLoaded", () => {
             const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzjRX4XgKyPk4mW0QeaaHjd5Xp5yaFtUsaVmNi0H0IGEOHIeht4PpRmh5zrTlMx2LQ50w/exec";
             
-            // IMPORTANT: You may need to change this to your Staffbase API endpoint
-            const STAFFBASE_API_URL = "https://api.staffbase.com/v2";
+            // --- IMPORTANT CONFIGURATION ---
+            // Replace 'app' with your actual Staffbase instance name.
+            const STAFFBASE_API_URL = "https://app.staffbase.com/api";
 
             const loadingView = document.getElementById('loading-view');
             const attestationList = document.getElementById('attestation-list');
