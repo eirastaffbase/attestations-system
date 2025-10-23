@@ -156,8 +156,8 @@
 
             let drawing = false;
             let currentPath;
-            let currentPathData;
             let currentUserId = '';
+            let points = []; 
 
             // --- Helper Functions ---
             function showView(view) {
@@ -181,36 +181,81 @@
                 };
             }
 
+            // --- Stroke Tapering/Smoothing Logic ---
+            // Helper to calculate distance between two points
+            function distance(p1, p2) {
+                return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+            }
+
+            // Helper to calculate midpoint between two points
+            function midpoint(p1, p2) {
+                return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+            }
+
+            // Function to create a tapered path segment
+            function createPathSegment(lastPoint, newPoint, lastWidth) {
+                const newWidth = Math.min(2.5, Math.max(0.5, 2.5 - distance(lastPoint, newPoint) / 15));
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', `M ${lastPoint.x.toFixed(2)} ${lastPoint.y.toFixed(2)} L ${newPoint.x.toFixed(2)} ${newPoint.y.toFixed(2)}`);
+                path.setAttribute('stroke', '#000');
+                path.setAttribute('stroke-width', ((lastWidth + newWidth) / 2).toFixed(2));
+                path.setAttribute('stroke-linecap', 'round');
+                path.setAttribute('fill', 'none');
+                svg.appendChild(path);
+                return newWidth;
+            }
+
             // --- Drawing Functions ---
             function startDrawing(e) {
                 e.preventDefault();
                 drawing = true;
                 const { x, y } = getEventPosition(e);
-
-                currentPathData = `M ${x.toFixed(2)} ${y.toFixed(2)}`;
-                currentPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                currentPath.setAttribute('d', currentPathData);
-                currentPath.setAttribute('stroke', '#000');
-                currentPath.setAttribute('stroke-width', '2');
-                currentPath.setAttribute('fill', 'none');
-                currentPath.setAttribute('stroke-linecap', 'round');
-
-                svg.appendChild(currentPath);
+                points = [{ x, y, width: 0.5 }]; // Start with a thin point
             }
 
             function draw(e) {
                 if (!drawing) return;
-
                 e.preventDefault();
                 const { x, y } = getEventPosition(e);
-                currentPathData += ` L ${x.toFixed(2)} ${y.toFixed(2)}`;
-                currentPath.setAttribute('d', currentPathData);
+                const lastPoint = points[points.length - 1];
+                const dist = distance(lastPoint, { x, y });
+                const newWidth = Math.min(2.5, Math.max(0.5, 2.5 - dist / 15));
+                points.push({ x, y, width: newWidth });
+
+                // Draw smoothed curve using multiple path segments for variable width
+                if (points.length > 2) {
+                    const p0 = points[points.length - 3];
+                    const p1 = points[points.length - 2];
+                    const p2 = points[points.length - 1];
+
+                    const mid1 = midpoint(p0, p1);
+                    const mid2 = midpoint(p1, p2);
+
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    // Use cubic bezier for a smoother curve
+                    const pathData = `M ${mid1.x.toFixed(2)} ${mid1.y.toFixed(2)} Q ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}, ${mid2.x.toFixed(2)} ${mid2.y.toFixed(2)}`;
+                    path.setAttribute('d', pathData);
+                    path.setAttribute('stroke', '#000');
+                    // Average width for the segment
+                    path.setAttribute('stroke-width', ((p1.width + p2.width) / 2).toFixed(2));
+                    path.setAttribute('stroke-linecap', 'round');
+                    path.setAttribute('fill', 'none');
+                    svg.appendChild(path);
+                }
             }
 
             function stopDrawing() {
+                if (!drawing) return;
                 drawing = false;
-                currentPath = null;
-                currentPathData = "";
+
+                // Taper the end of the stroke
+                if (points.length > 1) {
+                    const last = points[points.length - 1];
+                    const secondLast = points[points.length - 2];
+                    const lastMid = midpoint(secondLast, last);
+                    createPathSegment(lastMid, last, last.width);
+                }
+                points = [];
             }
 
             svg.addEventListener('mousedown', startDrawing);
