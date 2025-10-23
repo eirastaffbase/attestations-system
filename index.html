@@ -303,7 +303,7 @@
                     .then(result => {
                         if (result.status === 'success') {
                             // Signature found, show result view
-                            resultHeading.textContent = `Welcome back, ${currentUserId}! You have already signed for this resource.`;
+                            resultHeading.textContent = `Welcome back! You have already signed this post.`;
                             signatureDisplay.innerHTML = result.data;
                             showView(resultView);
                         } else if (result.status === 'not_found') {
