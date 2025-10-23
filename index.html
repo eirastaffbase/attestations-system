@@ -6,7 +6,7 @@
     <title>SVG E-Signature</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: Helvetica, Arial, sans-serif;
             display: grid;
             place-items: center;
             text-align: center;
@@ -85,8 +85,6 @@
 
     <div id="signature-view" class="hidden">
         <h2>Please Sign Below:</h2>
-        <p>User ID: <span id="display-user-id"></span></p>
-        <p>Resource ID: <span id="display-resource-id"></span></p>
         <div class="signature-container">
             <svg id="signature-pad" width="400" height="200"></svg>
         </div>
@@ -263,7 +261,7 @@
                     .then(response => response.json())
                     .then(getResult => {
                         if (getResult.status === 'success') {
-                            resultHeading.textContent = `Signature Saved for ${currentUserId}!`;
+                            resultHeading.textContent = `Signature saved!`;
                             signatureDisplay.innerHTML = getResult.data;
                         } else {
                             throw new Error(getResult.message || 'Could not retrieve saved signature.');
