@@ -40,11 +40,12 @@
         }
         .signature-svg {
             flex-shrink: 0;
-            width: 200px; /* Made wider */
-            height: 100px; /* Adjusted height to maintain 2:1 ratio */
+            width: 200px;
+            height: 100px;
             border: 1px solid #eee;
             background-color: #fff;
             border-radius: 4px;
+            overflow: hidden; /* Ensure any overflowing content is clipped */
         }
         .signature-svg svg {
             width: 100%;
@@ -146,7 +147,15 @@
              * Renders a single attestation item in the list.
              */
             async function renderItem(item) {
-                const { UserID, ResourceID, Timestamp, SignatureSVG } = item;
+                const { UserID, ResourceID, Timestamp } = item;
+                let { SignatureSVG } = item;
+
+                // --- FIX: Add viewBox to the SVG for proper scaling ---
+                // The original SVG is 400x200. This viewBox tells the browser how to scale the content.
+                if (SignatureSVG && SignatureSVG.startsWith('<svg')) {
+                    SignatureSVG = SignatureSVG.replace('<svg', '<svg viewBox="0 0 400 200"');
+                }
+                // --- End of fix ---
                 
                 let displayName = UserID;
                 let displayResource = ResourceID;
