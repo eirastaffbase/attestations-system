@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signature Attestations</title>
+    <style>
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            margin: 2em;
+        }
+        h1 {
+            text-align: center;
+        }
+        #loading-view {
+            text-align: center;
+            padding: 2em;
+            font-style: italic;
+            color: #555;
+        }
+        .hidden {
+            display: none;
+        }
+        #attestation-list {
+            list-style-type: none;
+            padding: 0;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .attestation-item {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .signature-svg {
+            flex-shrink: 0;
+            width: 150px;
+            height: 75px;
+            border: 1px solid #eee;
+            background-color: #fff;
+            border-radius: 4px;
+        }
+        .info {
+            flex-grow: 1;
+        }
+        .info p {
+            margin: 0 0 8px 0;
+        }
+        .info strong {
+            display: inline-block;
+            width: 100px;
+            color: #333;
+        }
+        .info .id {
+            font-family: monospace;
+            font-size: 0.9em;
+            color: #777;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<!-- 
+  Provide the API key here to fetch user/post names.
+  Example: data-api-key="YOUR_STAFFBASE_API_KEY"
+-->
+<body data-api-key="">
+    <h1>Signature Attestations</h1>
+
+    <div id="loading-view">
+        <p>Loading signatures...</p>
+    </div>
+
+    <ul id="attestation-list" class="hidden"></ul>
+    <div id="error-view" class="hidden error"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzjRX4XgKyPk4mW0QeaaHjd5Xp5yaFtUsaVmNi0H0IGEOHIeht4PpRmh5zrTlMx2LQ50w/exec";
+            
+            // IMPORTANT: You may need to change this to your Staffbase API endpoint
+            const STAFFBASE_API_URL = "https://api.staffbase.com/v2";
+
+            const loadingView = document.getElementById('loading-view');
+            const attestationList = document.getElementById('attestation-list');
+            const errorView = document.getElementById('error-view');
+
+            const apiKey = document.body.dataset.apiKey;
+
+            /**
+             * Fetches a resource from the Staffbase API with authorization.
+             */
+            async function fetchWithAuth(url) {
+                const headers = {
+                    // The Staffbase API docs suggest a token. Using 'Bearer' is a common standard.
+                    // This might need to be 'Basic' or another scheme depending on the API.
+                    'Authorization': `Bearer ${apiKey}`
+                };
+                const response = await fetch(url, { headers });
+                if (!response.ok) {
+                    throw new Error(`API request failed: ${response.status}`);
+                }
+                return response.json();
+            }
+
+            /**
+             * Fetches user and post details from the Staffbase API.
+             */
+            async function getApiDetails(userId, resourceId) {
+                try {
+                    const userUrl = `${STAFFBASE_API_URL}/users/${userId}`;
+                    const postUrl = `${STAFFBASE_API_URL}/posts/${resourceId}`;
+
+                    // Fetch both in parallel for efficiency
+                    const [user, post] = await Promise.all([
+                        fetchWithAuth(userUrl),
+                        fetchWithAuth(postUrl)
+                    ]);
+
+                    const userName = user?.userName?.value || userId;
+                    const postTitle = post?.contents?.en_US?.title || resourceId;
+
+                    return { userName, postTitle };
+                } catch (error) {
+                    console.error(`Failed to fetch API details for user ${userId}:`, error);
+                    // Fallback to IDs if API calls fail
+                    return { userName: userId, postTitle: resourceId };
+                }
+            }
+
+            /**
+             * Renders a single attestation item in the list.
+             */
+            async function renderItem(item) {
+                const { UserID, ResourceID, Timestamp, SignatureSVG } = item;
+                
+                let displayName = UserID;
+                let displayResource = ResourceID;
+
+                if (apiKey) {
+                    const details = await getApiDetails(UserID, ResourceID);
+                    displayName = details.userName;
+                    displayResource = details.postTitle;
+                }
+
+                const date = new Date(Timestamp).toLocaleString();
+
+                const li = document.createElement('li');
+                li.className = 'attestation-item';
+                li.innerHTML = `
+                    <div class="signature-svg">${SignatureSVG}</div>
+                    <div class="info">
+                        <p><strong>User:</strong> ${displayName}</p>
+                        <p><strong>Resource:</strong> ${displayResource}</p>
+                        <p><strong>Date:</strong> ${date}</p>
+                        ${apiKey ? `<p><strong class="id">User ID:</strong> <span class="id">${UserID}</span></p>` : ''}
+                    </div>
+                `;
+                attestationList.appendChild(li);
+            }
+
+            // Main function to fetch and display data
+            async function main() {
+                try {
+                    const response = await fetch(`${SCRIPT_URL}?action=getAll`);
+                    const result = await response.json();
+
+                    if (result.status === 'success' && result.data.length > 0) {
+                        attestationList.classList.remove('hidden');
+                        // Use Promise.all to wait for all items to be processed and rendered
+                        await Promise.all(result.data.map(item => renderItem(item)));
+                    } else {
+                        errorView.textContent = result.message || 'No signatures found.';
+                        errorView.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    console.error("Error fetching signatures:", error);
+                    errorView.textContent = `An error occurred: ${error.message}`;
+                    errorView.classList.remove('hidden');
+                } finally {
+                    loadingView.classList.add('hidden');
+                }
+            }
+
+            main();
+        });
+    </script>
+</body>
+</html>
+
+
