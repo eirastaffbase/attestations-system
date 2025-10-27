@@ -284,6 +284,25 @@
                 currentUserId = document.body.dataset.userId;
                 currentResourceId = document.body.dataset.resourceId;
 
+                // --- START: DEMO WORKAROUND ---
+                // If the resourceId is empty (because {resourceId} variable failed),
+                // try to parse it from the parent page's URL, which is the referrer.
+                if (!currentResourceId && document.referrer) {
+                    try {
+                        // Try to match an ID pattern like ".../article/68e08d63d09b383e577e34d0"
+                        // from the parent page's URL.
+                        const match = document.referrer.match(/article\/([a-f0-9]+)/);
+                        
+                        if (match && match[1]) {
+                            currentResourceId = match[1];
+                            console.log('Workaround: Parsed resourceId from referrer:', currentResourceId);
+                        }
+                    } catch (e) {
+                        console.error('Error parsing referrer:', e);
+                    }
+                }
+                // --- END: DEMO WORKAROUND ---
+
                 if (!currentUserId || !currentResourceId) {
                     resultHeading.textContent = 'Configuration error';
                     signatureDisplay.innerHTML = 'Could not find User ID or Resource ID.';
