@@ -10,6 +10,15 @@
             display: grid;
             place-items: center;
             text-align: center;
+            margin: 0; /* Added */
+            padding: 0 10px; /* Added */
+            box-sizing: border-box; /* Added */
+        }
+        
+        /* Added to help wrapping */
+        h2, h3 {
+             word-break: break-word;
+             max-width: 100%;
         }
 
         .signature-container {
@@ -17,12 +26,14 @@
             display: inline-block;
             border-radius: 5px;
             margin-top: 10px;
+            max-width: 100%; /* Added */
         }
 
         #signature-pad {
             background-color: #fff;
             cursor: crosshair;
             display: block;
+            max-width: 100%; /* Added */
         }
 
         /* Utility class to hide elements */
@@ -56,6 +67,7 @@
         /* Updated style for the display box */
         #signature-display {
             width: 400px;
+            max-width: 100%; /* Added */
             min-height: 200px; /* Set min-height */
             background-color: #fff;
             color: #333; /* Changed from green */
@@ -63,7 +75,7 @@
             padding: 10px;
             border-radius: 5px;
             border: 1px solid #ddd;
-            box-sizing: border-box; /* Include padding in width */
+            box-sizing: border-box; /* Added */
             display: grid; /* Use grid to center content */
             place-items: center;
             font-family: monospace;
@@ -129,6 +141,20 @@
                 signatureView.classList.add('hidden');
                 resultView.classList.add('hidden');
                 view.classList.remove('hidden');
+            }
+
+            /**
+             * NEW: Fetches a resource with one automatic retry on failure.
+             */
+            function fetchWithRetry(url, retries = 1) {
+                return fetch(url).catch(err => {
+                    if (retries > 0) {
+                        console.log('Fetch failed, retrying...');
+                        return fetchWithRetry(url, retries - 1);
+                    }
+                    // After all retries, throw the last error
+                    throw err;
+                });
             }
 
             function getEventPosition(e) {
@@ -220,6 +246,7 @@
                 svg.innerHTML = '';
             });
 
+            // --- UPDATED SAVE LOGIC ---
             saveBtn.addEventListener('click', () => {
                 if (svg.children.length === 0) {
                     alert("Please provide a signature first.");
@@ -229,7 +256,7 @@
                 const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">${svg.innerHTML}</svg>`;
                 const entry = {
                     userId: currentUserId,
-                    resourceId: currentResourceId, // <-- ADDED
+                    resourceId: currentResourceId,
                     svgData: svgString
                 };
 
@@ -237,6 +264,7 @@
                 saveBtn.disabled = true;
                 clearBtn.disabled = true;
 
+                // Optimistically show "Saving..."
                 resultHeading.textContent = 'Saving signature...';
                 signatureDisplay.innerHTML = 'Please wait.';
                 showView(resultView);
@@ -252,63 +280,35 @@
                         if (postResult.status !== 'success') {
                             throw new Error(postResult.message || 'Failed to save signature.');
                         }
-                        // After successful save, GET it back to display
-                        const fetchUrl = `${SCRIPT_URL}?userId=${encodeURIComponent(currentUserId)}&resourceId=${encodeURIComponent(currentResourceId)}`; // <-- UPDATED
-                        return fetch(fetchUrl);
-                    })
-                    .then(response => response.json())
-                    .then(getResult => {
-                        if (getResult.status === 'success') {
-                            resultHeading.textContent = 'Signature saved!';
-                            signatureDisplay.innerHTML = getResult.data;
-                        } else {
-                            throw new Error(getResult.message || 'Could not retrieve saved signature.');
-                        }
+                        
+                        // Success! No need to GET. Just display the SVG.
+                        resultHeading.textContent = 'Signature saved!';
+                        signatureDisplay.innerHTML = svgString; // Use the local variable
+                        svg.innerHTML = ''; // Clear the pad *after* successful save
                     })
                     .catch(error => {
+                        // "if something breaks don't visibly show it"
                         console.error('Error during save process:', error);
-                        resultHeading.textContent = 'An error occurred';
-                        signatureDisplay.innerHTML = `Error: ${error.message}<br><br>Please try again.`;
+                        // Silently reset to the signature view.
+                        // The signature is still on the pad because we didn't clear it.
+                        showView(signatureView);
                     })
                     .finally(() => {
+                        // Always re-enable buttons
                         saveBtn.textContent = 'Save signature';
                         saveBtn.disabled = false;
                         clearBtn.disabled = false;
-                        svg.innerHTML = ''; 
                     });
             });
 
-            // --- NEW: Initial Check Function ---
+            // --- UPDATED: Initial Check Function ---
             function checkSignature() {
                 // Get IDs from the <body> tag
                 currentUserId = document.body.dataset.userId;
                 currentResourceId = document.body.dataset.resourceId;
 
-                console.log('Current User ID:', currentUserId);
-                console.log('Current Resource ID:', currentResourceId);
-                console.log('Document Referrer:', document.referrer);
-
-                // --- START: DEMO WORKAROUND ---
-                // If the resourceId is empty (because {resourceId} variable failed),
-                // try to parse it from the parent page's URL, which is the referrer.
-                if (!currentResourceId && document.referrer) {
-                    console.log('Attempting to parse resourceId from referrer URL...');
-                    try {
-                        // Try to match an ID pattern like ".../article/68e08d63d09b383e577e34d0"
-                        // from the parent page's URL.
-                        const match = document.referrer.match(/article\/([a-f0-9]+)/);
-                        
-                        if (match && match[1]) {
-                            currentResourceId = match[1];
-                            console.log('Workaround: Parsed resourceId from referrer:', currentResourceId);
-                        }
-                    } catch (e) {
-                        console.error('Error parsing referrer:', e);
-                    }
-                }
-                // --- END: DEMO WORKAROUND ---
-
                 if (!currentUserId || !currentResourceId) {
+                    // This is a config error, it's ok to show this.
                     resultHeading.textContent = 'Configuration error';
                     signatureDisplay.innerHTML = 'Could not find User ID or Resource ID.';
                     showView(resultView);
@@ -320,7 +320,8 @@
 
                 const fetchUrl = `${SCRIPT_URL}?userId=${encodeURIComponent(currentUserId)}&resourceId=${encodeURIComponent(currentResourceId)}`;
 
-                fetch(fetchUrl)
+                // Use the new retry function
+                fetchWithRetry(fetchUrl)
                     .then(response => response.json())
                     .then(result => {
                         if (result.status === 'success') {
@@ -332,17 +333,18 @@
                             // No signature, show signing pad
                             showView(signatureView);
                         } else {
-                            // Handle other errors
-                            resultHeading.textContent = 'An error occurred';
-                            signatureDisplay.innerHTML = `Error: ${result.message}`;
-                            showView(resultView);
+                            // Other server-side error (e.g., "invalid_params")
+                            // Per request, fail silently to the signature pad
+                            console.error('Server error:', result.message);
+                            showView(signatureView);
                         }
                     })
                     .catch(error => {
-                        console.error('Error:', error);
-                        resultHeading.textContent = 'Fetch error';
-                        signatureDisplay.innerHTML = `Error: ${error.message}`;
-                        showView(resultView);
+                        // Network error or fetch failure after retries
+                        // "if something breaks don't visibly show it"
+                        // Fail silently by showing the signature pad, as if 'not_found'
+                        console.error('Fetch error:', error);
+                        showView(signatureView);
                     });
             }
 
