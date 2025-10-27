@@ -201,10 +201,17 @@
                 if (!drawing) return;
                 e.preventDefault();
                 const { x, y } = getEventPosition(e);
+                const newPoint = { x, y };
                 const lastPoint = points[points.length - 1];
-                const dist = distance(lastPoint, { x, y });
+                const dist = distance(lastPoint, newPoint);
+
+                // --- NEW: Only draw if we've moved a minimum distance ---
+                // This prevents shakiness when drawing slowly.
+                if (dist < 2) return;
+                // --- END NEW ---
+
                 const newWidth = Math.min(2.5, Math.max(0.5, 2.5 - dist / 14));
-                points.push({ x, y, width: newWidth });
+                points.push({ x, y, width: newWidth }); // The new point has the calculated width
 
                 // --- NEW: DRAW THE VERY FIRST TAPERING SEGMENT ---
                 if (points.length === 2) {
@@ -355,10 +362,13 @@
                 currentResourceId = document.body.dataset.resourceId;
 
                 if (!currentUserId || !currentResourceId) {
-                    // This is a config error, it's ok to show this.
-                    resultHeading.textContent = 'Configuration error';
-                    signatureDisplay.innerHTML = 'Could not find User ID or Resource ID.';
-                    showView(resultView);
+                    // --- UPDATED FOR DEMO ---
+                    // Show the signature pad but disable saving if IDs are missing.
+                    showView(signatureView);
+                                        
+                    // Disable and grey out the save button.
+                    saveBtn.disabled = true;
+                    saveBtn.style.backgroundColor = '#ccc';
                     return;
                 }
 
