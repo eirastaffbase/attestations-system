@@ -178,7 +178,8 @@
                 return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
             }
             function createPathSegment(lastPoint, newPoint, lastWidth) {
-                const newWidth = Math.min(2.5, Math.max(0.5, 2.5 - distance(lastPoint, newPoint) / 15));
+                // UPDATED: Changed 15 to 13 for more taper
+                const newWidth = Math.min(2.5, Math.max(0.5, 2.5 - distance(lastPoint, newPoint) / 13)); // <-- CHANGED
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 path.setAttribute('d', `M ${lastPoint.x.toFixed(2)} ${lastPoint.y.toFixed(2)} L ${newPoint.x.toFixed(2)} ${newPoint.y.toFixed(2)}`);
                 path.setAttribute('stroke', '#000');
@@ -202,10 +203,28 @@
                 const { x, y } = getEventPosition(e);
                 const lastPoint = points[points.length - 1];
                 const dist = distance(lastPoint, { x, y });
-                const newWidth = Math.min(2.5, Math.max(0.5, 2.5 - dist / 15));
+                const newWidth = Math.min(2.5, Math.max(0.5, 2.5 - dist / 14));
                 points.push({ x, y, width: newWidth });
 
-                if (points.length > 2) {
+                // --- NEW: DRAW THE VERY FIRST TAPERING SEGMENT ---
+                if (points.length === 2) {
+                    const p0 = points[0];
+                    const p1 = points[1];
+                    const mid1 = midpoint(p0, p1);
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    const pathData = `M ${p0.x.toFixed(2)} ${p0.y.toFixed(2)} L ${mid1.x.toFixed(2)} ${mid1.y.toFixed(2)}`;
+                    path.setAttribute('d', pathData);
+                    path.setAttribute('stroke', '#000');
+                    // Use the initial width (0.5) and the new width to create the taper
+                    path.setAttribute('stroke-width', ((p0.width + p1.width) / 2).toFixed(2));
+                    path.setAttribute('stroke-linecap', 'round');
+                    path.setAttribute('fill', 'none');
+                    svg.appendChild(path);
+                } 
+                // --- END NEW ---
+                
+                // --- CHANGED: Added 'else' ---
+                else if (points.length > 2) { 
                     const p0 = points[points.length - 3];
                     const p1 = points[points.length - 2];
                     const p2 = points[points.length - 1];
@@ -224,15 +243,44 @@
             function stopDrawing() {
                 if (!drawing) return;
                 drawing = false;
-                if (points.length > 1) {
-                    const last = points[points.length - 1];
-                    const secondLast = points[points.length - 2];
-                    const lastMid = midpoint(secondLast, last);
-                    createPathSegment(lastMid, last, last.width);
-                }
-                points = [];
-            }
 
+                // --- FIX FOR DOTS (No change here) ---
+                if (points.length === 1) {
+                    const p = points[0];
+                    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    dot.setAttribute('cx', p.x.toFixed(2));
+                    dot.setAttribute('cy', p.y.toFixed(2));
+                    dot.setAttribute('r', 1.25); 
+                    dot.setAttribute('fill', '#000');
+                    svg.appendChild(dot);
+                } 
+                // --- NEW: EXPLICITLY DRAW THE FINAL TAPERING SEGMENT ---
+                else if (points.length > 1) { 
+                    const last = points[points.length - 1];
+                    // Need at least two points to make a segment
+                    const secondLast = points.length > 1 ? points[points.length - 2] : points[0]; 
+
+                    const lastMid = midpoint(secondLast, last);
+                    // Get the width of the last drawn curve
+                    const curveWidth = (secondLast.width + last.width) / 2;
+
+                    // Draw the final line segment from the last midpoint to the end
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.setAttribute('d', `M ${lastMid.x.toFixed(2)} ${lastMid.y.toFixed(2)} L ${last.x.toFixed(2)} ${last.y.toFixed(2)}`);
+                    path.setAttribute('stroke', '#000');
+                    
+                    // Taper from the last curve width down to the minimum width
+                    const finalWidth = (curveWidth + 0.5) / 2;
+                    
+                    path.setAttribute('stroke-width', finalWidth.toFixed(2));
+                    path.setAttribute('stroke-linecap', 'round');
+                    path.setAttribute('fill', 'none');
+                    svg.appendChild(path);
+                }
+                // --- END NEW ---
+                
+                points = []; // Clear points at the very end
+            }
             svg.addEventListener('mousedown', startDrawing);
             svg.addEventListener('mousemove', draw);
             svg.addEventListener('touchstart', startDrawing, { passive: false });
